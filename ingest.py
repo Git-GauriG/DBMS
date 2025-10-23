@@ -20,8 +20,8 @@ USERNAME = "hwdbms"
 PASSWORD = "Init@123"
 
 BASE_DIR  = Path(__file__).parent
-BRAND_CSV = str((BASE_DIR / "data" / "brand-detail-url-etc_0_0_0.csv").resolve())
-SPEND_CSV = str((BASE_DIR / "data" / "2021-01-19--data_01be88c2-0306-48b3-0042-fa0703282ad6_1304_5_0.csv").resolve())
+BRAND_CSV = str((BASE_DIR / "brand-detail-url-etc_0_0_0.csv").resolve())
+SPEND_CSV = str((BASE_DIR / "2021-01-19--data_01be88c2-0306-48b3-0042-fa0703282ad6_1304_5_0.csv").resolve())
 # -------------------------------------------------------
 
 
