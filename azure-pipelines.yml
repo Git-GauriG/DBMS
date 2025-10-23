@@ -1,4 +1,4 @@
-# Azure Pipelines for HW8 ingestion (Windows agent, robust path detection)
+# Azure Pipelines for HW8 ingestion (Windows agent, robust path detection - FIXED)
 trigger:
   branches:
     include:
@@ -14,10 +14,10 @@ steps:
     inputs:
       versionSpec: '3.11'
 
-  # Show repo layout (debug)
+  # Show repo layout (debug) - PowerShell 5 friendly
   - powershell: |
       Write-Host "Repo root: $(Build.SourcesDirectory)"
-      Get-ChildItem -Path "$(Build.SourcesDirectory)" -Recurse -Depth 2 | Select-Object FullName
+      Get-ChildItem -Path "$(Build.SourcesDirectory)" -Recurse -Force | Select-Object -First 200 FullName
     displayName: 'List files (debug)'
 
   # Install Microsoft ODBC Driver 18 for SQL Server (x64) via MSI
@@ -30,29 +30,37 @@ steps:
       Write-Host "ODBC 18 installed."
     displayName: 'Install ODBC Driver 18 (MSI)'
 
-  # Install Python deps (auto-detect requirements.txt path)
+  # Install Python deps (auto-detect) - FIXED Join-Path usage
   - powershell: |
+      $ErrorActionPreference = "Stop"
       $root = "$(Build.SourcesDirectory)"
-      $candidates = @(
-        Join-Path $root "HW8\requirements.txt",
-        Join-Path $root "requirements.txt"
-      )
-      $req = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-      if (-not $req) { throw "requirements.txt not found. Looked at: $($candidates -join ', ')" }
+      $req1 = Join-Path $root "HW8\requirements.txt"
+      $req2 = Join-Path $root "requirements.txt"
+      if (Test-Path $req1) {
+        $req = $req1
+      } elseif (Test-Path $req2) {
+        $req = $req2
+      } else {
+        throw "requirements.txt not found at either `$req1 or `$req2"
+      }
       Write-Host "Using requirements: $req"
       python -m pip install --upgrade pip
       pip install -r "$req"
     displayName: 'Install Python deps (auto-detect)'
 
-  # Run ingestion (auto-detect ingest.py path)
+  # Run ingestion (auto-detect) - FIXED Join-Path usage
   - powershell: |
+      $ErrorActionPreference = "Stop"
       $root = "$(Build.SourcesDirectory)"
-      $candidates = @(
-        Join-Path $root "HW8\ingest.py",
-        Join-Path $root "ingest.py"
-      )
-      $script = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-      if (-not $script) { throw "ingest.py not found. Looked at: $($candidates -join ', ')" }
+      $py1 = Join-Path $root "HW8\ingest.py"
+      $py2 = Join-Path $root "ingest.py"
+      if (Test-Path $py1) {
+        $script = $py1
+      } elseif (Test-Path $py2) {
+        $script = $py2
+      } else {
+        throw "ingest.py not found at either `$py1 or `$py2"
+      }
       Write-Host "Running: $script"
       python "$script"
     displayName: 'Run ingestion (auto-detect)'
