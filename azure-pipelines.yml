@@ -1,3 +1,4 @@
+# Azure Pipelines for HW8 ingestion (Windows agent, ODBC via MSI)
 trigger:
   branches:
     include:
@@ -13,18 +14,27 @@ steps:
     inputs:
       versionSpec: '3.11'
 
-  # Install ODBC Driver 18 (winget). Use MSI fallback if winget is blocked.
+  # Install Microsoft ODBC Driver 18 for SQL Server (x64) via MSI (reliable in CI)
   - powershell: |
-      winget install --id Microsoft.MSODBCSQL.18 -e `
-        --accept-source-agreements --accept-package-agreements
-    displayName: 'Install ODBC Driver 18 (winget)'
+      $ErrorActionPreference = "Stop"
+      $url = "https://go.microsoft.com/fwlink/?linkid=2290265"  # msodbcsql18 x64
+      $msi = "$(Agent.TempDirectory)\msodbcsql18.msi"
+      Write-Host "Downloading ODBC 18 from $url ..."
+      Invoke-WebRequest -Uri $url -OutFile $msi
+      Write-Host "Installing ODBC 18 ..."
+      Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn IACCEPTMSODBCSQLLICENSETERMS=YES ADDLOCAL=ALL" -Wait -NoNewWindow
+      Write-Host "ODBC 18 installed."
+    displayName: 'Install ODBC Driver 18 (MSI)'
 
+  # (Optional) Install sqlcmd/bcp tools for debugging in CI
   # - powershell: |
-  #     $url = "https://go.microsoft.com/fwlink/?linkid=2290265"
-  #     $msi = "$(Agent.TempDirectory)\msodbcsql18.msi"
+  #     $ErrorActionPreference = "Stop"
+  #     $url = "https://go.microsoft.com/fwlink/?linkid=2187333"  # MsSqlCmdLn18.msi
+  #     $msi = "$(Agent.TempDirectory)\MsSqlCmdLn18.msi"
   #     Invoke-WebRequest -Uri $url -OutFile $msi
-  #     Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn IACCEPTMSODBCSQLLICENSETERMS=YES ADDLOCAL=ALL" -Wait
-  #   displayName: 'Install ODBC Driver 18 (MSI fallback)'
+  #     Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn IACCEPTMSSQLTOOLSLICENSETERMS=YES ADDLOCAL=ALL" -Wait -NoNewWindow
+  #     Write-Host "sqlcmd installed."
+  #   displayName: 'Install SQL Server Command Line Tools (optional)'
 
   - script: |
       python -m pip install --upgrade pip
@@ -35,10 +45,7 @@ steps:
       python HW8/ingest.py
     displayName: 'Run ingestion'
     env:
-      # Prefer passing a full ODBC connection string as a secret pipeline variable
-      # Example value:
-      # Driver={ODBC Driver 18 for SQL Server};Server=tcp:hwdbms-server.database.windows.net,1433;Database=hwdbms;Uid=hwdbms;Pwd=Init@123;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;
-      AZURE_SQL_SERVER: hwdbms-server.database.windows.net
+      AZURE_SQL_SERVER: hwdbms.database.windows.net
       AZURE_SQL_DATABASE: hwdbms
       AZURE_SQL_USER: hwdbms
-      AZURE_SQL_PASSWORD: $(AZURE_SQL_PASSWORD)  # set as secret in pipeline
+      AZURE_SQL_PASSWORD: $(AZURE_SQL_PASSWORD)
