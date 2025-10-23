@@ -1,0 +1,23 @@
+﻿trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'windows-latest'
+
+steps:
+  - checkout: self
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.11'
+
+  - script: |
+      python -m pip install --upgrade pip
+      pip install -r HW8/requirements.txt
+    displayName: 'Install Python deps'
+
+  - script: |
+      python HW8/ingest.py
+    displayName: 'Run ingestion to Azure SQL'
