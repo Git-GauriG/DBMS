@@ -14,7 +14,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL
 
 # ---------- CONFIG: hard-coded per your setup ----------
-SERVER   = "datamanagement-server.database.windows.net"
+SERVER   = "hwdbms.database.windows.net"
 DATABASE = "hwdbms"
 USERNAME = "hwdbms"
 PASSWORD = "Init@123"
