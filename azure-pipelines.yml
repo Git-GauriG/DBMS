@@ -1,4 +1,4 @@
-# Azure Pipelines for HW8 ingestion (Windows agent)
+# Azure Pipelines for HW8 ingestion (Windows agent, robust path detection)
 trigger:
   branches:
     include:
@@ -14,12 +14,10 @@ steps:
     inputs:
       versionSpec: '3.11'
 
-  # Show repo layout to help debugging paths
+  # Show repo layout (debug)
   - powershell: |
       Write-Host "Repo root: $(Build.SourcesDirectory)"
-      Get-ChildItem -Recurse -Depth 2 -Path "$(Build.SourcesDirectory)" | ForEach-Object {
-        "{0}`t{1}" -f $_.PSIsContainer, $_.FullName
-      }
+      Get-ChildItem -Path "$(Build.SourcesDirectory)" -Recurse -Depth 2 | Select-Object FullName
     displayName: 'List files (debug)'
 
   # Install Microsoft ODBC Driver 18 for SQL Server (x64) via MSI
@@ -32,31 +30,32 @@ steps:
       Write-Host "ODBC 18 installed."
     displayName: 'Install ODBC Driver 18 (MSI)'
 
-  # Detect requirements.txt and ingest.py paths dynamically
+  # Install Python deps (auto-detect requirements.txt path)
   - powershell: |
       $root = "$(Build.SourcesDirectory)"
-      $req1 = Join-Path $root "HW8\requirements.txt"
-      $req2 = Join-Path $root "requirements.txt"
-      if (Test-Path $req1) { $env:REQ = $req1 } elseif (Test-Path $req2) { $env:REQ = $req2 } else { throw "requirements.txt not found" }
-      $py1 = Join-Path $root "HW8\ingest.py"
-      $py2 = Join-Path $root "ingest.py"
-      if (Test-Path $py1) { $env:SCRIPT = $py1 } elseif (Test-Path $py2) { $env:SCRIPT = $py2 } else { throw "ingest.py not found" }
-      Write-Host "Using requirements: $env:REQ"
-      Write-Host "Using script:      $env:SCRIPT"
-      echo "REQ=$env:REQ" >> $(Pipeline.Workspace)\pathvars.txt
-      echo "SCRIPT=$env:SCRIPT" >> $(Pipeline.Workspace)\pathvars.txt
-    displayName: 'Detect paths'
-
-  - script: |
-      for /f "tokens=1,2 delims==" %%A in ($(Pipeline.Workspace)\pathvars.txt) do set %%A=%%B
+      $candidates = @(
+        Join-Path $root "HW8\requirements.txt",
+        Join-Path $root "requirements.txt"
+      )
+      $req = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+      if (-not $req) { throw "requirements.txt not found. Looked at: $($candidates -join ', ')" }
+      Write-Host "Using requirements: $req"
       python -m pip install --upgrade pip
-      pip install -r "%REQ%"
-    displayName: 'Install Python deps'
+      pip install -r "$req"
+    displayName: 'Install Python deps (auto-detect)'
 
-  - script: |
-      for /f "tokens=1,2 delims==" %%A in ($(Pipeline.Workspace)\pathvars.txt) do set %%A=%%B
-      python "%SCRIPT%"
-    displayName: 'Run ingestion'
+  # Run ingestion (auto-detect ingest.py path)
+  - powershell: |
+      $root = "$(Build.SourcesDirectory)"
+      $candidates = @(
+        Join-Path $root "HW8\ingest.py",
+        Join-Path $root "ingest.py"
+      )
+      $script = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+      if (-not $script) { throw "ingest.py not found. Looked at: $($candidates -join ', ')" }
+      Write-Host "Running: $script"
+      python "$script"
+    displayName: 'Run ingestion (auto-detect)'
     env:
       AZURE_SQL_SERVER: hwdbms.database.windows.net
       AZURE_SQL_DATABASE: hwdbms
