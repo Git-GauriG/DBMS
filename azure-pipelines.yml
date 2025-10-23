@@ -13,6 +13,19 @@ steps:
     inputs:
       versionSpec: '3.11'
 
+  # Install ODBC Driver 18 (winget). Use MSI fallback if winget is blocked.
+  - powershell: |
+      winget install --id Microsoft.MSODBCSQL.18 -e `
+        --accept-source-agreements --accept-package-agreements
+    displayName: 'Install ODBC Driver 18 (winget)'
+
+  # - powershell: |
+  #     $url = "https://go.microsoft.com/fwlink/?linkid=2290265"
+  #     $msi = "$(Agent.TempDirectory)\msodbcsql18.msi"
+  #     Invoke-WebRequest -Uri $url -OutFile $msi
+  #     Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn IACCEPTMSODBCSQLLICENSETERMS=YES ADDLOCAL=ALL" -Wait
+  #   displayName: 'Install ODBC Driver 18 (MSI fallback)'
+
   - script: |
       python -m pip install --upgrade pip
       pip install -r HW8/requirements.txt
@@ -20,4 +33,12 @@ steps:
 
   - script: |
       python HW8/ingest.py
-    displayName: 'Run ingestion to Azure SQL'
+    displayName: 'Run ingestion'
+    env:
+      # Prefer passing a full ODBC connection string as a secret pipeline variable
+      # Example value:
+      # Driver={ODBC Driver 18 for SQL Server};Server=tcp:hwdbms-server.database.windows.net,1433;Database=hwdbms;Uid=hwdbms;Pwd=Init@123;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;
+      AZURE_SQL_SERVER: hwdbms-server.database.windows.net
+      AZURE_SQL_DATABASE: hwdbms
+      AZURE_SQL_USER: hwdbms
+      AZURE_SQL_PASSWORD: $(AZURE_SQL_PASSWORD)  # set as secret in pipeline
